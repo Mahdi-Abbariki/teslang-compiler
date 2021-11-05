@@ -8,6 +8,7 @@ class Lexer
 {
     private string $sourceCode;
     private int $filePointer;
+    private int $fileLenght;
 
     public function __construct($fileAddress)
     {
@@ -17,6 +18,7 @@ class Lexer
         }
         $this->sourceCode = file_get_contents($fileAddress);
         $this->filePointer = 0;
+        $this->fileLenght = strlen($this->sourceCode);
     }
 
     public function nextToken()
@@ -25,6 +27,15 @@ class Lexer
         while ($this->isWhiteSpace($c) || $this->isComment($c))
             $c = $this->getChar();
 
+    }
+
+    /**
+     * determine if we are at the end of file or not
+     * @return bool
+     */
+    public function isEOF(): bool
+    {
+        return $this->filePointer >= $this->fileLenght;
     }
 
     private function getChar()

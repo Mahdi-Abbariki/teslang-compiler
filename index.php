@@ -8,5 +8,7 @@ use Lexer\Lexer;
 const TEST_FILE_ADDRESS = "dist/tslang.txt";
 
 $lex = new Lexer(TEST_FILE_ADDRESS);
-$lex->nextToken();
 
+
+while (!$lex->isEOF())
+    echo $lex->nextToken();
