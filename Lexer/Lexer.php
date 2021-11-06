@@ -33,10 +33,8 @@ class Lexer
         if ($token = $this->isAlphabeticChar($c))
             return $token;
 
-        if ($token = $this->isNumeric($c))
-            return $token;
-
-        die(1);
+        if (($token = $this->isNumeric($c)) !== false)
+            return (string)$token;
     }
 
     /**
