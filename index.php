@@ -11,4 +11,5 @@ $lex = new Lexer(TEST_FILE_ADDRESS);
 
 
 while (!$lex->isEOF())
-    echo $lex->nextToken();
+//    $lex->nextToken();
+    echo $lex->nextToken(), "\n";

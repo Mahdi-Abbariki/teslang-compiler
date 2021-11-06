@@ -8,7 +8,7 @@ class Lexer
 {
     private string $sourceCode;
     private int $filePointer;
-    private int $fileLenght;
+    private int $fileLength;
 
     public function __construct($fileAddress)
     {
@@ -18,7 +18,7 @@ class Lexer
         }
         $this->sourceCode = file_get_contents($fileAddress);
         $this->filePointer = 0;
-        $this->fileLenght = strlen($this->sourceCode);
+        $this->fileLength = strlen($this->sourceCode);
     }
 
     public function nextToken()
@@ -27,6 +27,16 @@ class Lexer
         while ($this->isWhiteSpace($c) || $this->isComment($c))
             $c = $this->getChar();
 
+        if ($token = $this->isSpecialCharacter($c))
+            return $token;
+
+        if ($token = $this->isAlphabeticChar($c))
+            return $token;
+
+        if ($token = $this->isNumeric($c))
+            return $token;
+
+        die(1);
     }
 
     /**
@@ -35,7 +45,7 @@ class Lexer
      */
     public function isEOF(): bool
     {
-        return $this->filePointer >= $this->fileLenght;
+        return $this->filePointer >= $this->fileLength;
     }
 
     private function getChar()
@@ -77,6 +87,131 @@ class Lexer
             }
             $this->unGetChar();
         }
+        return false;
+    }
+
+    private function isSpecialCharacter($char)
+    {
+        if ($this->checkForOneCharSpecialTokens($char)) {
+            return $char;
+        } else {
+            //check for other special chars
+
+            if ($char == "=") {
+                $c = $this->getChar();
+                if ($c == "=")
+                    return "==";
+                $this->unGetChar();
+                return "=";
+            } else if ($char == "<") {
+                $c = $this->getChar();
+                if ($c == "=")
+                    return "<=";
+                $this->unGetChar();
+                return "<";
+            } else if ($char == ">") {
+                $c = $this->getChar();
+                if ($c == "=")
+                    return ">=";
+                $this->unGetChar();
+                return ">";
+            } else if ($char == "!") {
+                $c = $this->getChar();
+                if ($c == "=")
+                    return "!=";
+                $this->unGetChar();
+                return "!";
+            } else if ($char == "|") {
+                $c = $this->getChar();
+                if ($c == "|")
+                    return "!=";
+                $this->unGetChar();//the token is || and we don't have any token as |
+                $this->unGetChar();
+                return false;
+            } else if ($char == "&") {
+                $c = $this->getChar();
+                if ($c == "&")
+                    return "&&";
+                $this->unGetChar();//the token is && and we don't have any token as &
+                $this->unGetChar();
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private function checkForOneCharSpecialTokens($char)
+    {
+        return in_array($char, [
+            "(",
+            ")",
+            "[",
+            "]",
+            ";",
+            ":",
+            "?",
+            "+",
+            "-",
+            "*",
+            "/",
+            "%",
+            ",",
+        ]);
+    }
+
+    private function isAlphabeticChar($char)
+    {
+        if (!preg_match("/[a-zA-Z_]/", $char))
+            return false;
+        $token = $char;//first char is accepted, so the regex should be changed
+        $char = $this->getChar();
+        while (preg_match("/[a-zA-Z_0-9]/", $char)) {// get maximum number of chars (Maximal Munch)
+            $token .= $char;
+            $char = $this->getChar();
+        }
+        $this->unGetChar();
+        if ($this->isReservedToken($token))//reserved keys are more important than other strings
+            return $token;
+
+        if ($this->isValType($token))
+            return $token;
+
+        return $token;
+    }
+
+    private function isValType($token)
+    {
+        return in_array($token, ["Nil", "Int", "Array"]);
+    }
+
+    private function isReservedToken($token)
+    {
+        if (strcmp($token, "function") === 0)
+            return true;
+        return in_array($token, [
+            "returns",
+            "return",
+            "if",
+            "else",
+            "while",
+            "do",
+            "foreach",
+            "of",
+            "end",
+            "val",
+        ]);
+    }
+
+    private function isNumeric($char)
+    {
+        $token = "";
+        while (preg_match("/[0-9]/", $char)) {// get maximum number of chars (Maximal Munch)
+            $token .= $char;
+            $char = $this->getChar();
+        }
+        $this->unGetChar();
+        if ($token != "")
+            return $token;
         return false;
     }
 }
