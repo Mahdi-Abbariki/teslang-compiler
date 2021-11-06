@@ -2,14 +2,13 @@
 include "autoloader.php";
 
 
-use Lexer\Lexer;
+use Classes\Lexer;
 
 
-const TEST_FILE_ADDRESS = "dist/tslang.txt";
+const TEST_FILE_ADDRESS = "dist/tslang.txt"; // you can change this line for different input file
 
 $lex = new Lexer(TEST_FILE_ADDRESS);
 
 
 while (!$lex->isEOF())
-//    $lex->nextToken();
     echo $lex->nextToken(), "\n";

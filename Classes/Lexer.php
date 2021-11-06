@@ -1,8 +1,6 @@
 <?php
 
-namespace Lexer;
-
-use Library\Helper;
+namespace Classes;
 
 class Lexer
 {
@@ -13,7 +11,7 @@ class Lexer
     public function __construct($fileAddress)
     {
         if (!is_file($fileAddress)) {
-            Helper::printString("the specified File Address is Wrong");
+            echo "the specified File Address is Wrong", "\n";
             die(1);
         }
         $this->sourceCode = file_get_contents($fileAddress);
