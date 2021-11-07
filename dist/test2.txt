@@ -1,0 +1,31 @@
+--This is a sample code in the TSLANG language
+
+function sum3(Int a, Int b, Int c) returns Int:
+
+
+
+
+
+	val Int sum;
+	sum = a+b    + c;
+	if(sum == 1245):
+		sum = sum -       4;
+	end
+
+	return sum;
+end
+
+
+function sumArray(Array n) returns Int:
+	val Int a;
+	a = 12;
+	foreach (i of n):
+		a = a + i;
+	end
+
+
+	printInt(n[0]);
+	printInt(a);
+	return a;
+
+end
