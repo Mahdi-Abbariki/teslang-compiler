@@ -8,6 +8,7 @@ class Lexer
     private int $filePointer;
     private int $fileLength;
     private int $lineCounter = 0;
+    private $currentToken = null;
 
     public function __construct($fileAddress)
     {
@@ -20,7 +21,16 @@ class Lexer
         $this->fileLength = strlen($this->sourceCode);
     }
 
-    public function nextToken()
+
+    public function getToken(){
+        return $this->currentToken;
+    }
+
+    public function getNextToken(){
+        $this->currentToken = $this->nextToken();
+    }
+
+    private function nextToken()
     {
         $c = $this->getChar();
         while ($this->isWhiteSpace($c) || $this->isComment($c))
