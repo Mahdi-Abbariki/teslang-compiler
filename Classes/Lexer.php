@@ -23,6 +23,8 @@ class Lexer
 
 
     public function getToken(){
+        if($this->currentToken == null)
+            $this->getNextToken();
         return $this->currentToken;
     }
 
