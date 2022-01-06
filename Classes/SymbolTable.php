@@ -7,12 +7,11 @@ class SymbolTable
     const INT_TYPE = 2;     //Array
 
 
-    private $id;
-    private $type;
-    private $value;
-    private $isFunc;
-    private $paramCount;
-    private $table = [];// for child nodes that is a function (isFunc =true) it contais params info
+    private string $id;
+    private int $type;
+    private bool $isFunc;
+    private int $paramCount=0;
+    private array $table = [];// for child nodes that is a function (isFunc =true) it contais params info
 
 
     /**
@@ -24,13 +23,20 @@ class SymbolTable
 
     }
 
-    public static function setData($id,$value,$type,$isFunc,$paramCount){
+    public static function setFunction($id,$type,$paramCount){
         $new = new SymbolTable(false);
         $new->setId($id);
-        $new->setValue($value);
         $new->setType($type);
-        $new->setIsFunc($isFunc);
+        $new->setIsFunc(true);
         $new->setParamCount($$paramCount);
+        return $new;
+    }
+
+    public static function setVariable($id,$type){
+        $new = new SymbolTable(false);
+        $new->setId($id);
+        $new->setType($type);
+        $new->setIsFunc(false);
         return $new;
     }
 
@@ -45,36 +51,31 @@ class SymbolTable
     }
 
     private function setBaseFunctions(){
-
-        $getIntFunctionNode = SymbolTable::setData('getInt','',SymbolTable::INT_TYPE,true,0);
+        $getIntFunctionNode = SymbolTable::setFunction('getInt',SymbolTable::INT_TYPE,true,0);
         $this->addNode($getIntFunctionNode);
 
 
-        $printIntFunctionNode = SymbolTable::setData('printInt','',SymbolTable::NULL_TYPE,true,1);
-        $printIntFunctionNode->addNode(SymbolTable::setData('n','',SymbolTable::INT_TYPE,false,0));
+        $printIntFunctionNode = SymbolTable::setFunction('printInt',SymbolTable::NULL_TYPE,true,1);
+        $printIntFunctionNode->addNode(SymbolTable::setVariable('n',SymbolTable::INT_TYPE));
         $this->addNode($printIntFunctionNode);
 
-        $createArrayFunctionNode = SymbolTable::setData('createArray','',SymbolTable::ARRAY_TYPE,true,1);
-        $createArrayFunctionNode->addNode(SymbolTable::setData('n','',SymbolTable::INT_TYPE,false,0));
+        $createArrayFunctionNode = SymbolTable::setFunction('createArray',SymbolTable::ARRAY_TYPE,true,1);
+        $createArrayFunctionNode->addNode(SymbolTable::setVariable('n',SymbolTable::INT_TYPE));
         $this->addNode($createArrayFunctionNode);
 
-        $arrayLengthFunctionNode = SymbolTable::setData('arrayLength','',SymbolTable::INT_TYPE,true,1);
-        $arrayLengthFunctionNode->addNode(SymbolTable::setData('v','',SymbolTable::ARRAY_TYPE,false,0));
+        $arrayLengthFunctionNode = SymbolTable::setFunction('arrayLength',SymbolTable::INT_TYPE,true,1);
+        $arrayLengthFunctionNode->addNode(SymbolTable::setVariable('v',SymbolTable::ARRAY_TYPE));
         $this->addNode($arrayLengthFunctionNode);
 
-        $exitFunctionNode = SymbolTable::setData('exit','',SymbolTable::NULL_TYPE,true,1);
-        $exitFunctionNode->addNode(SymbolTable::setData('n','',SymbolTable::INT_TYPE,false,0));
-        $this->addNode($arrayLengthFunctionNode);
+        $exitFunctionNode = SymbolTable::setFunction('exit','',SymbolTable::NULL_TYPE,true,1);
+        $exitFunctionNode->addNode(SymbolTable::setVariable('n',SymbolTable::INT_TYPE));
+        $this->addNode($exitFunctionNode);
     }
 
 
     //Setters
     public function setId($id){
         $this->id = $id;
-    }
-
-    public function setValue($val){
-        $this->value = $val;
     }
 
     public function setType($type){
