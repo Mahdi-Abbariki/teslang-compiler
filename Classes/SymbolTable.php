@@ -7,22 +7,25 @@ class SymbolTable
     const INT_TYPE = 2;     //Array
 
 
-    private static $instance = null;
-    
     private $id;
     private $type;
     private $value;
     private $isFunc;
     private $paramCount;
-    private $table;
+    private $table = [];// for child nodes that is a function (isFunc =true) it contais params info
 
 
-    public function __construct(){
-        $this->table = [];
+    /**
+     * @param bool $setBaseFunction
+     */
+    public function __construct($setBaseFunction = true){
+        if($setBaseFunction)
+            $this->setBaseFunctions();
+
     }
 
     public static function setData($id,$value,$type,$isFunc,$paramCount){
-        $new = new SymbolTable();
+        $new = new SymbolTable(false);
         $new->setId($id);
         $new->setValue($value);
         $new->setType($type);
@@ -39,6 +42,29 @@ class SymbolTable
             if($id == $symbol->getId())
                 $res = true;
         return $res;
+    }
+
+    private function setBaseFunctions(){
+
+        $getIntFunctionNode = SymbolTable::setData('getInt','',SymbolTable::INT_TYPE,true,0);
+        $this->addNode($getIntFunctionNode);
+
+
+        $printIntFunctionNode = SymbolTable::setData('printInt','',SymbolTable::NULL_TYPE,true,1);
+        $printIntFunctionNode->addNode(SymbolTable::setData('n','',SymbolTable::INT_TYPE,false,0));
+        $this->addNode($printIntFunctionNode);
+
+        $createArrayFunctionNode = SymbolTable::setData('createArray','',SymbolTable::ARRAY_TYPE,true,1);
+        $createArrayFunctionNode->addNode(SymbolTable::setData('n','',SymbolTable::INT_TYPE,false,0));
+        $this->addNode($createArrayFunctionNode);
+
+        $arrayLengthFunctionNode = SymbolTable::setData('arrayLength','',SymbolTable::INT_TYPE,true,1);
+        $arrayLengthFunctionNode->addNode(SymbolTable::setData('v','',SymbolTable::ARRAY_TYPE,false,0));
+        $this->addNode($arrayLengthFunctionNode);
+
+        $exitFunctionNode = SymbolTable::setData('exit','',SymbolTable::NULL_TYPE,true,1);
+        $exitFunctionNode->addNode(SymbolTable::setData('n','',SymbolTable::INT_TYPE,false,0));
+        $this->addNode($arrayLengthFunctionNode);
     }
 
 
@@ -66,6 +92,9 @@ class SymbolTable
             $this->paramCount = $count;
     }
 
+    /**
+     * @param SymbolTable $symbol
+     */
     public function addNode($symbol)
     {
         if($symbol instanceof $symbol)
