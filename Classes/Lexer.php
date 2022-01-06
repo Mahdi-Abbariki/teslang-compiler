@@ -7,6 +7,7 @@ class Lexer
     private string $sourceCode;
     private int $filePointer;
     private int $fileLength;
+    private int $lineCounter = 0;
 
     public function __construct($fileAddress)
     {
@@ -44,6 +45,10 @@ class Lexer
         return $this->filePointer >= $this->fileLength;
     }
 
+    public function getCounter(){
+        return $this->lineCounter;
+    }
+
     private function getChar()
     {
         return substr($this->sourceCode, ($this->filePointer++), 1);// get one char from source code string and add pointer
@@ -61,6 +66,8 @@ class Lexer
      */
     private function isWhiteSpace($char): bool
     {
+        if(in_array($char,["\n", "\r", "\r\n", PHP_EOL]))
+            $this->lineCounter++;
         return in_array($char, [" ", "\t", "\n", "\r", "\r\n", PHP_EOL]);
     }
 
@@ -79,6 +86,7 @@ class Lexer
                 while ($char != PHP_EOL)
                     $char = $this->getChar();
                 $this->getChar();
+                $this->lineCounter++;
                 return true;
             }
             $this->unGetChar();
