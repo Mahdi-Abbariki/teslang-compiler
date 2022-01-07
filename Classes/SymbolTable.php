@@ -1,5 +1,7 @@
 <?php
 
+namespace Classes;
+
 class SymbolTable 
 {
     const NULL_TYPE = 0;    //NIL 
@@ -28,7 +30,7 @@ class SymbolTable
         $new->setId($id);
         $new->setType($type);
         $new->setIsFunc(true);
-        $new->setParamCount($$paramCount);
+        $new->setParamCount($paramCount);
         return $new;
     }
 

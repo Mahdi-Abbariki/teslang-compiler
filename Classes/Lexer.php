@@ -4,10 +4,24 @@ namespace Classes;
 
 class Lexer
 {
+
+    const BUILT_IN_TOKENS = [
+        "returns",
+        "return",
+        "if",
+        "else",
+        "while",
+        "do",
+        "foreach",
+        "of",
+        "end",
+        "val",
+    ];
+
     private string $sourceCode;
     private int $filePointer;
     private int $fileLength;
-    private int $lineCounter = 0;
+    private int $lineCounter = 1;
     private $currentToken = null;
 
     public function __construct($fileAddress)
@@ -30,11 +44,13 @@ class Lexer
 
     public function getNextToken(){
         $this->currentToken = $this->nextToken();
+        echo $this->lineCounter. " : " . $this->currentToken."\n";
     }
 
     private function nextToken()
     {
         $c = $this->getChar();
+        
         while ($this->isWhiteSpace($c) || $this->isComment($c))
             $c = $this->getChar();
 
@@ -63,7 +79,10 @@ class Lexer
 
     private function getChar()
     {
-        return substr($this->sourceCode, ($this->filePointer++), 1);// get one char from source code string and add pointer
+        $c = substr($this->sourceCode, ($this->filePointer++), 1);
+        if(in_array($c,["\n", "\r", "\r\n", PHP_EOL]))
+            $this->lineCounter++;
+        return  $c;// get one char from source code string and add pointer
     }
 
     private function unGetChar()
@@ -78,8 +97,6 @@ class Lexer
      */
     private function isWhiteSpace($char): bool
     {
-        if(in_array($char,["\n", "\r", "\r\n", PHP_EOL]))
-            $this->lineCounter++;
         return in_array($char, [" ", "\t", "\n", "\r", "\r\n", PHP_EOL]);
     }
 
@@ -98,7 +115,6 @@ class Lexer
                 while ($char != PHP_EOL)
                     $char = $this->getChar();
                 $this->getChar();
-                $this->lineCounter++;
                 return true;
             }
             $this->unGetChar();
@@ -204,18 +220,7 @@ class Lexer
     {
         if (strcmp($token, "function") === 0)
             return true;
-        return in_array($token, [
-            "returns",
-            "return",
-            "if",
-            "else",
-            "while",
-            "do",
-            "foreach",
-            "of",
-            "end",
-            "val",
-        ]);
+        return in_array($token, self::BUILT_IN_TOKENS);
     }
 
     private function isNumeric($char)
