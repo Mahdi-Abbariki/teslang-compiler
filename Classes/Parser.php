@@ -48,17 +48,17 @@ class Parser extends Lexer
 	private const VAL_KEYWORD = "val";
 	private const COMMA_KEYWORD = ",";
 
-	private const INT_TYPE = "int";
 	private const NUll_TYPE = "null";
 
 
 
 	private SymbolTable $symbolTable;
+	private $scopeId = 0;
 
 	public function __construct($fileAddress)
 	{
 		parent::__construct($fileAddress);
-		$this->symbolTable = new SymbolTable();
+		$this->symbolTable = new SymbolTable(true);
 	}
 
 	public function startParsing()
@@ -78,8 +78,8 @@ class Parser extends Lexer
 		if ($token == self::FUNCTION_KEYWORD) {
 			$this->getNextToken();
 
-			$funcName = $this->getToken();
-			$this->iden($funcName) ? $this->getNextToken() : null;
+			$funcName = $this->getToken(); //functions can not be repeated even with same type
+			$this->iden($funcName, true, '') ? $this->getNextToken() : null;
 
 			$token = $this->getToken();
 			if ($token == self::OPEN_PARENTHESES) {
@@ -100,18 +100,23 @@ class Parser extends Lexer
 
 						$token = $this->getToken();
 						if ($token == self::COLON) {
+							$this->scopeId++;
+							//function scope is started so add it to Symbol Table
+							$functionNode = SymbolTable::setFunction($funcName, $funcType, count($funcParams));
+							foreach ($funcParams as $symbol)
+								$functionNode->addNode($symbol, $this->scopeId);
+							$this->symbolTable->addNode($functionNode,0);
+
 							$this->getNextToken();
 
-							$this->body();
+							$this->body($functionNode);
 
 							$token = $this->getToken();
 							if ($token == self::END_KEYWORD) {
+								$this->symbolTable->resetScope($this->scopeId--);
 								$this->getNextToken();
 
-								$functionNode = SymbolTable::setFunction($funcName, $funcType, count($funcParams));
-								foreach ($funcParams as $symbol)
-									$functionNode->addNode($symbol);
-								$this->symbolTable->addNode($functionNode);
+
 
 								return true;
 							} else
@@ -125,21 +130,21 @@ class Parser extends Lexer
 			} else
 				$this->syntaxError("expected `" . self::OPEN_PARENTHESES . "`; $token given");
 		} else
-			if(!$this->isEOF())
-				$this->syntaxError("function keyword can not be found");
+			if (!$this->isEOF())
+			$this->syntaxError("function keyword can not be found");
 	}
 
 
 	/**
 	 * can end the execution on error
 	 */
-	private function body()
+	private function body($funcNode)
 	{
-		if ($this->stmt())
-			$this->body();
+		if ($this->stmt($funcNode))
+			$this->body($funcNode);
 	}
 
-	private function stmt()
+	private function stmt($funcNode)
 	{
 
 		//variable
@@ -168,13 +173,13 @@ class Parser extends Lexer
 					if ($token == self::CLOSE_PARENTHESES) {
 						$this->getNextToken();
 
-						$this->stmt();
+						$this->stmt($funcNode);
 
 						$token = $this->getToken();
 						if ($token == self::ELSE_KEYWORD) {
 							$this->getNextToken();
 
-							$this->stmt();
+							$this->stmt($funcNode);
 							return true;
 						}
 
@@ -204,7 +209,7 @@ class Parser extends Lexer
 						if ($token == self::DO_KEYWORD) {
 							$this->getNextToken();
 
-							if ($this->stmt())
+							if ($this->stmt($funcNode))
 								return true;
 						} else
 							$this->syntaxError("expected `" . self::DO_KEYWORD . "`; $token given");
@@ -225,7 +230,7 @@ class Parser extends Lexer
 				$this->getNextToken();
 
 				$token = $this->getToken();
-				if ($this->iden($token)) {
+				if ($this->iden($token, false)) {
 					$this->getNextToken();
 
 					$token = $this->getToken();
@@ -238,7 +243,7 @@ class Parser extends Lexer
 							if ($token == self::CLOSE_PARENTHESES) {
 								$this->getNextToken();
 
-								if ($this->stmt())
+								if ($this->stmt($funcNode))
 									return true;
 							} else
 								$this->syntaxError("expected `" . self::CLOSE_PARENTHESES . "`; $token given");
@@ -255,7 +260,20 @@ class Parser extends Lexer
 			$this->getNextToken();
 
 			$type = $this->expr();
+
 			if ($type) {
+
+				if (!isset($type->type)) {
+					$typeSym = SymbolTable::contains($this->symbolTable->getTable(), $type->name, $this->scopeId);
+					if ($typeSym) {
+						$type->type = $typeSym->getType();
+						$type->typeName = SymbolTable::getTypeName($typeSym->getType());
+					}
+				}
+				$returnType = $type->type ?? '';
+				if ($returnType != $funcNode->getType())
+					$this->log("returning a value with wrong type from \"" . $funcNode->getId() . "\" !");
+
 				$token = $this->getToken();
 				if ($token == self::SEMICOLON_KEYWORD) {
 					$this->getNextToken();
@@ -266,11 +284,13 @@ class Parser extends Lexer
 		}
 
 		if ($token == self::COLON) {
+			$this->scopeId++;
 			$this->getNextToken();
 
-			$this->body();
+			$this->body($funcNode);
 			$token = $this->getToken();
 			if ($token == self::END_KEYWORD) {
+				$this->symbolTable->resetScope($this->scopeId--);
 				$this->getNextToken();
 				return true;
 			} else
@@ -293,24 +313,32 @@ class Parser extends Lexer
 	private function defvar()
 	{
 		$token = $this->getToken();
+		$res = false;
 		if ($token == self::VAL_KEYWORD) {
 			$this->getNextToken();
+
 			$varType = $this->type();
 			$varName = $this->getToken();
-			$this->iden($varName) ? $this->getNextToken() : null;
-			$this->symbolTable->addNode(SymbolTable::setVariable($varName, $varType));
-			return true;
+			$this->iden($varName, true, $varType) ? $this->getNextToken() : $res = false;
+			$this->symbolTable->addNode(SymbolTable::setVariable($varName, $varType), $this->scopeId);
+
+
+			$res = true;
 		}
-		return false;
+		return $res;
 	}
 
 
 	/**
+	 * This function chain return type can be Int, identifier, function
 	 * Grammar is as following :
 	 * 
 	 * expr -> assign_expr
 	 * 
-	 * assign_expr -> assign_expr = or_expr | or_expr
+	 * assign_expr -> assign_expr = short_if_expr | short_if_expr
+	 * 
+	 * short_if_expr -> short_if_expr ? or_expr : or_expr
+	 * 					| or_expr
 	 * 
 	 * or_expr -> or_expr || and_expr | and_expr
 	 * 
@@ -335,10 +363,8 @@ class Parser extends Lexer
 	 * factor_expr -> + factor_expr
 	 *         | - factor_expr
 	 *         | ! factor_expr
-	 *         | short_if_expr
+	 *         | identifier_expr
 	 * 
-	 * short_if_expr -> short_if_expr ? short_if_expr : identifier_expr
-	 * 					| identifier_expr
 	 * 
 	 * identifier_expr -> 	( identifier_expr )
 	 * 						| identifier_expr [ identifier_expr ]
@@ -355,11 +381,58 @@ class Parser extends Lexer
 
 	private function assignExpr()
 	{
-		$type = $this->orExpr();
-
-		while ($this->getToken() == self::ASSIGNMENT_KEYWORD) {
+		$type = $this->shortIfExpr();
+		$token = $this->getToken();
+		while ($token == self::ASSIGNMENT_KEYWORD) {
 			$this->getNextToken();
+			$secondType = $this->shortIfExpr();
+
+
+			$symbol = SymbolTable::contains($this->symbolTable->getTable(), $type->name, $this->scopeId);
+			if ($type->typeName == "identifier") {
+				if (($secondType->type ?? '') != SymbolTable::INT_TYPE) {
+					$secSym = SymbolTable::contains($this->symbolTable->getTable(), $secondType->name, $this->scopeId);
+					if ($secSym) {
+						$secondType->type = $secSym->getType();
+						$secondType->typeName = SymbolTable::getTypeName($secondType->type);
+					}
+				}
+				if ($symbol) {
+					//check if it is a identifier the assignment is with same type 
+					if ($symbol->getType() != $secondType->type ?? 'undefined') {
+						$id = $symbol->getId();
+						$typeName = SymbolTable::getTypeName($symbol->getType());
+						$this->log("$id is being assigned to a wrong type '($typeName) = ($secondType->typeName)'");
+					}
+				} else { // identifier is not defined but it is being assigned we can assign it based on assignment type
+
+					$this->symbolTable->addNode(SymbolTable::setVariable($type->name, $secondType->type ?? ''), $this->scopeId);
+				}
+			}
+
+
+
+
+			$token = $this->getToken();
+		}
+		return $type;
+	}
+
+
+	private function shortIfExpr()
+	{
+		$type = $this->orExpr();
+		$token = $this->getToken();
+		if ($token == self::QUESTION_MARK) {
+			$this->getNextToken();
+
 			$this->orExpr();
+
+			$token = $this->getToken();
+			if ($token == self::COLON) { //colon for else not for new scope
+				$this->getNextToken();
+			} else
+				$this->syntaxError("expected `" . self::COLON . "`; $token given");
 		}
 		return $type;
 	}
@@ -408,9 +481,11 @@ class Parser extends Lexer
 	private function sumExpr()
 	{
 		$type = $this->termExpr();
-		while (in_array($this->getToken(), [self::ADDITION_KEYWORD, self::SUBTRACT_KEYWORD])) {
+		$token = $this->getToken();
+		while (in_array($token, [self::ADDITION_KEYWORD, self::SUBTRACT_KEYWORD])) {
 			$this->getNextToken();
 			$this->termExpr();
+			$token = $this->getToken();
 		}
 		return $type;
 	}
@@ -428,33 +503,16 @@ class Parser extends Lexer
 
 	private function factorExpr()
 	{
-		$type = $this->shortIfExpr();
+		// $type = 
 		while (in_array($this->getToken(), [self::POSITIVATE_KEYWORD, self::NEGATE_KEYWORD, self::NOT_KEYWORD])) {
 			$this->getNextToken();
-			return $this->shortIfExpr();
+			//return $this->identifierExpr();
 		}
-		return $type;
+		return $this->identifierExpr();;
 	}
 
-	private function shortIfExpr()
+	private function identifierExpr()
 	{
-		$type = $this->identifierExpr();
-		$token = $this->getToken();
-		if ($token == self::QUESTION_MARK) {
-			$this->getNextToken();
-
-			$this->identifierExpr();
-
-			$token = $this->getToken();
-			if ($token == self::COLON) {
-				$this->getNextToken();
-			} else
-				$this->syntaxError("expected `" . self::COLON . "`; $token given");
-		}
-		return $type;
-	}
-
-	private function identifierExpr(){
 		$type = $this->primaryExpr();
 		$token = $this->getToken();
 		if ($token == self::OPEN_BRACKET) {
@@ -484,28 +542,58 @@ class Parser extends Lexer
 	private function primaryExpr()
 	{
 		$token = $this->getToken();
+		$object = false;
 		if ($this->num($token)) {
+			$object = (object)[];
+			$object->name = $token;
+			$object->typeName = SymbolTable::getTypeName(SymbolTable::INT_TYPE);
+			$object->type = SymbolTable::INT_TYPE;
 			$this->getNextToken();
-			return self::INT_TYPE;
-		} else if ($this->iden($token)) {
+		} else if ($this->iden($token, false)) {
+			$object = (object)[];
+			$object->name = $token;
+			$object->typeName = "identifier";
 			$this->getNextToken();
 
 			$token = $this->getToken();
 			if ($token == self::OPEN_PARENTHESES) {
 				$this->getNextToken();
-				$this->clist();
+
+				$functionSymbol = SymbolTable::contains($this->symbolTable->getTable(), $object->name, $this->scopeId);
+				$params = $this->clist();
+
+				if ($functionSymbol && $functionSymbol->isFunction()) { //if function is defined start checking params
+					$paramCount = $functionSymbol->getParamCount();
+					$provided = count($params);
+					if ($paramCount > $provided)
+						$this->log("$object->name needs $paramCount arguments but only $provided given!");
+					if ($paramCount < $provided)
+						$this->log("$object->name needs $paramCount arguments but $provided given, some of them are useless!");
+
+					if ($provided >= $paramCount) {
+						$funcParamsSymbols = $functionSymbol->getTable();
+						for ($i = 0; $i < $paramCount; $i++) {
+							if (!$params[$i]->hasType() || $funcParamsSymbols[$i]->getType() != $params[$i]->getType())
+								$this->log("wrong type for argument " . $i + 1 . " of '$object->name'");
+						}
+					}
+				}
+
+
 				$token = $this->getToken();
 				if ($token == self::CLOSE_PARENTHESES) {
 					$this->getNextToken();
 
-					return "function";
+					//function
+					$object->typeName = "function";
 				} else
 					$this->syntaxError("expected `" . self::CLOSE_PARENTHESES . "`; $token given");
 			}
 
-			return "identifier";
+
+			//identifier
 		}
-		return false;
+		return $object;
 	}
 
 	/**
@@ -523,7 +611,7 @@ class Parser extends Lexer
 
 		$paramType = $this->type();
 		$paramName = $this->getToken();
-		$this->iden($paramName) ? $this->getNextToken() : null;
+		$this->iden($paramName, true, $paramType) ? $this->getNextToken() : null;
 
 		$res[] = SymbolTable::setVariable($paramName, $paramType);
 
@@ -537,31 +625,38 @@ class Parser extends Lexer
 		return Helper::array_flatten($res);
 	}
 
-	private function clist($canBeNull = true)
+	private function clist($canBeNull = true): array
 	{
 		$token = $this->getToken();
 		// clist used only once and ) comes after it,
 		// so if the next token is ) the clist is Empty
 		if ($token == self::CLOSE_PARENTHESES && $canBeNull)
-			return true;
+			return [];
 
-		$this->expr();
+		$type = $this->expr();
 
-		//$res = [];
+		$res = [];
 
-		//$paramType = $this->type();
-		//$paramName = $this->getToken();
-		//$this->iden($paramName) ? $this->getNextToken() : null;
+		if (!isset($type->type)) {
+			$typeSym = SymbolTable::contains($this->symbolTable->getTable(), $type->name, $this->scopeId);
+			if ($typeSym) {
+				$type->type = $typeSym->getType();
+				$type->typeName = SymbolTable::getTypeName($typeSym->getType());
+			}
+		}
 
-		//$res[] = SymbolTable::setVariable($paramName, "Nil");
+		$paramType = $type->type ?? '';
+		$paramName = $type->name;
+
+		$res[] = SymbolTable::setVariable($paramName, $paramType);
 
 		$token = $this->getToken();
 		if ($token == self::COMMA_KEYWORD) {
 			$this->getNextToken();
-			$this->clist(false);
+			array_push($res, $this->clist(false));
 		}
 
-		return true;
+		return Helper::array_flatten($res);
 	}
 
 	/**
@@ -573,9 +668,9 @@ class Parser extends Lexer
 		$res = "";
 		if ($token == self::ARRAY_KEYWORD)
 			$res = SymbolTable::ARRAY_TYPE;
-		elseif ($token == self::NIL_KEYWORD)
+		else if ($token == self::NIL_KEYWORD)
 			$res = SymbolTable::NULL_TYPE;
-		elseif ($token == self::INT_KEYWORD)
+		else if ($token == self::INT_KEYWORD)
 			$res = SymbolTable::INT_TYPE;
 		else
 			$this->syntaxError("Type must be one of following : " . self::ARRAY_KEYWORD . " or " . self::INT_KEYWORD . " or " . self::NIL_KEYWORD);
@@ -595,23 +690,55 @@ class Parser extends Lexer
 
 	/**
 	 * can end the execution on error
+	 * if an iden is not being declared it is being used (an iden has only two state 1)beingDeclared 2)being used)
 	 */
-	private function iden($token)
-	{ 
-		if(in_array($token,Lexer::BUILT_IN_TOKENS))
+	private function iden($token, $beingDeclared = false, $type = '')
+	{
+		if (in_array($token, Lexer::BUILT_IN_TOKENS))
 			return false;
-		if (preg_match('/^[a-zA-z][a-zA-Z_0-9]*$/', $token))
+		if (preg_match('/^[a-zA-z][a-zA-Z_0-9]*$/', $token)) {
+			if ($beingDeclared) {
+				$alreadYDeclared = $this->checkDeclared($token, false);
+				if ($alreadYDeclared) { //variable can be declare again with same type but functions can't
+					$typeName = SymbolTable::getTypeName($alreadYDeclared->getType());
+					if ($alreadYDeclared->getType() != $type) // syntax error will exit the process so log won't be called again
+						$this->syntaxError("$token is already Declared with another Type ($typeName)");
+					$this->log("$token is already Declared with the same Type ($typeName)");
+				}
+			} else { //beingUsed so it must be declared
+				$this->checkDeclared($token);
+			}
+
 			return true;
-		else
+		} else
 			return false;
+	}
+
+	/**
+	 * check if token is declared
+	 */
+	private function checkDeclared($token, $showWarning = true): bool | SymbolTable
+	{
+		$symbol = SymbolTable::contains($this->symbolTable->getTable(), $token, $this->scopeId);
+		if (!$symbol && $showWarning)
+			$this->log("$token is not defined");
+		return $symbol;
 	}
 
 	private function syntaxError($string)
 	{
-		$bt = debug_backtrace(1);
-		$caller = array_shift($bt);
+		//$bt = debug_backtrace(1);
+		//$caller = array_shift($bt);
 		//var_dump($caller);
-		echo "Parser Error :\nLine Number :" . $this->getCounter() . ", Reason : $string\n\n";
+		echo "\e[31mParser Error :\nLine Number :" . $this->getCounter() . ", Reason : $string\e[0m\n\n";
 		die(1);
+	}
+
+	private function log($string)
+	{
+		//$bt = debug_backtrace(1);
+		//$caller = array_shift($bt);
+		//var_dump($caller);
+		echo "\e[93mParser Warning :\nLine Number :" . $this->getCounter() . ", Reason : $string\n\n";
 	}
 }

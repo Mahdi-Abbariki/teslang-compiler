@@ -1,18 +1,26 @@
 function find(Array A, Int x) returns Int:
-    val Int n;
+    val Int n;--val Int n;--val Array n;
     i = 0;
     foreach (n of A):
+        --val Int scopeTest;
         if (n == k):
+            --val Int scopeTest;
             return i;
         end
+        --scopeTest = i;
         i = i + 1;
-        end
+    end
     return -1;
 end
 
 function main() returns Int:
     val Array A;
     val Int a;
+    --val Array x;
+    --val Array n;
+    --a = 0;
+    --A = 0;
+    --A = createArray(3,9);
     A = createArray(3);
     A[0] = 3;
     A[1] = 8;
@@ -20,5 +28,10 @@ function main() returns Int:
     printInt(find(A, a));
     printInt(find(A));
     printInt(find(a, A));
+    
+    
+    --printInt(finda(A));
+    --printInt(find(A, B,a));
+    --printInt(find(A, a,a));
     return A;
 end

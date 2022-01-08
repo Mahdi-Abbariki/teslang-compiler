@@ -21,7 +21,6 @@ class Lexer
     private string $sourceCode;
     private int $filePointer;
     private int $fileLength;
-    private int $lineCounter = 1;
     private $currentToken = null;
 
     public function __construct($fileAddress)
@@ -33,18 +32,16 @@ class Lexer
         $this->sourceCode = file_get_contents($fileAddress);
         $this->filePointer = 0;
         $this->fileLength = strlen($this->sourceCode);
+        $this->getNextToken();
     }
 
 
     public function getToken(){
-        if($this->currentToken == null)
-            $this->getNextToken();
         return $this->currentToken;
     }
 
     public function getNextToken(){
         $this->currentToken = $this->nextToken();
-        echo $this->lineCounter. " : " . $this->currentToken."\n";
     }
 
     private function nextToken()
@@ -74,14 +71,13 @@ class Lexer
     }
 
     public function getCounter(){
-        return $this->lineCounter;
+        $c = substr($this->sourceCode, 0, $this->filePointer);
+        return substr_count($c,"\n")+1;
     }
 
     private function getChar()
     {
         $c = substr($this->sourceCode, ($this->filePointer++), 1);
-        if(in_array($c,["\n", "\r", "\r\n", PHP_EOL]))
-            $this->lineCounter++;
         return  $c;// get one char from source code string and add pointer
     }
 
