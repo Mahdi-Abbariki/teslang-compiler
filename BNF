@@ -1,0 +1,59 @@
+prog::=     func |
+            func prog
+
+func::=     function iden ( flist ) returns type : {print 'proc iden'} body end {print '\n'}
+
+body::=     stmt |
+            stmt body
+
+stmt::=     expr ; {print "\n"} |
+            defvar ; {print "\n"} |
+            if ( expr ) {$out = label(); jnz expr->addr, $out} stmt {print $out: } |
+            if ( expr ) {$out = label(); jnz expr->addr, $out} stmt else {print $out: } stmt |
+            while {$out =label(); $beg = label(); print $beg:}  ( expr ) {print jnz expr->addr, $out} do stmt {print jmp $beg \n $out:} |
+->TODO      foreach ( iden of expr ) stmt |
+            return expr ; {print mov r0,expr->addr ret \n} |
+            : body end {print \n}
+
+defvar::=   val type iden {iden->addr = temp()}
+
+expr::=     iden ( {print call iden} clist ) |
+            expr [ expr ] |
+            expr ? {$out = label(); jnz expr->addr, $out} expr : {print $out: } expr |
+            expr = expr     {print mov expr1->addr, expr2->addr \n} |
+            expr + expr     {print add expr1->addr, expr1->addr, expr2->addr \n} |
+            expr - expr     {print sub expr1->addr, expr1->addr, expr2->addr} |
+            expr * expr     {print mul expr1->addr, expr1->addr, expr2->addr} |
+            expr / expr     {print div expr1->addr, expr1->addr, expr2->addr} |
+            expr % expr     {print mod expr1->addr, expr1->addr, expr2->addr} |
+            expr < expr     {print cmp< expr1->addr, expr1->addr, expr2->addr} |
+            expr > expr     {print cmp> expr1->addr, expr1->addr, expr2->addr} |
+            expr == expr    {print cmp= expr1->addr, expr1->addr, expr2->addr} |
+->TODO      expr != expr |
+            expr <= expr    {print cmp<= expr1->addr, expr1->addr, expr2->addr} |
+            expr >= expr    {print cmp>= expr1->addr, expr1->addr, expr2->addr} |
+            expr || {$out = label(); res->addr = const(1); print jz expr1->addr, $out} expr {print expr1->addr OR expr2->addr \n $out:} |
+            expr && {$out = label(); res->addr = const(0); print jnz expr1->addr, $out} expr {print expr1->addr AND expr2->addr \n $out} |
+            ! expr {print NOT expr} |
+            - expr {NEGATE expr} |
+            + expr |
+            ( expr ) |
+            iden {expr->addr = iden->addr}|
+            num {expr->addr = const(num)}
+
+
+flist::=    |
+            type iden {iden->addr = temp()} |
+            type iden {iden->addr = temp()} , flist
+
+clist::=    |
+            expr {print expr->addr} |
+            expr {pritn expr->addr}, {print ,} clist
+
+type::=     Int |
+            Array |
+            Nil
+
+num::=      [0-9]+
+
+iden::=     [a-zA-Z_][a-zA-Z_0-9]*

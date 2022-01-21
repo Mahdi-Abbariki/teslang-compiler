@@ -15,6 +15,7 @@ class SymbolTable
     private bool $isFunc;
     private int $paramCount = 0;
     private array $table = []; // for child nodes that is a function (isFunc =true) it contains params info
+    public string $addr;
 
 
     /**
@@ -79,8 +80,8 @@ class SymbolTable
     public function resetScope($scope)
     {
         $table = $this->getTable();
-        foreach ($table as $key=>$symbol) {
-            if($symbol->getScope() >= $scope)
+        foreach ($table as $key => $symbol) {
+            if ($symbol->getScope() >= $scope)
                 unset($table[$key]);
         }
         $this->table = array_values($table);
@@ -136,6 +137,11 @@ class SymbolTable
         $this->scope = $scope;
     }
 
+    public function setAddr($addr)
+    {
+        $this->addr = $addr;
+    }
+
     public function setType($type)
     {
         if (in_array($type, [self::ARRAY_TYPE, self::INT_TYPE, self::NULL_TYPE]))
@@ -157,10 +163,11 @@ class SymbolTable
     /**
      * @param SymbolTable $symbol
      */
-    public function addNode($symbol, $scope)
+    public function addNode($symbol, $scope, $addr = "")
     {
         if ($symbol instanceof SymbolTable) {
             $symbol->setScope($scope);
+            $symbol->setAddr($addr);
             array_push($this->table, $symbol);
         }
     }

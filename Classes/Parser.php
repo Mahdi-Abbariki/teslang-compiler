@@ -5,6 +5,7 @@ namespace Classes;
 use Library\Helper;
 use Classes\Lexer;
 use Classes\SymbolTable;
+use Classes\IR;
 
 class Parser extends Lexer
 {
@@ -54,11 +55,13 @@ class Parser extends Lexer
 
 	private SymbolTable $symbolTable;
 	private $scopeId = 0;
+	private IR $ir;
 
 	public function __construct($fileAddress)
 	{
 		parent::__construct($fileAddress);
 		$this->symbolTable = new SymbolTable(true);
+		$this->ir = new IR(true);
 	}
 
 	public function startParsing()
@@ -100,12 +103,17 @@ class Parser extends Lexer
 
 						$token = $this->getToken();
 						if ($token == self::COLON) {
+							//produce IR for function
+							$this->ir->write("proc	" . $funcName . "\n");
+
+
+
 							$this->scopeId++;
 							//function scope is started so add it to Symbol Table
 							$functionNode = SymbolTable::setFunction($funcName, $funcType, count($funcParams));
 							foreach ($funcParams as $symbol)
 								$functionNode->addNode($symbol, $this->scopeId);
-							$this->symbolTable->addNode($functionNode,0);
+							$this->symbolTable->addNode($functionNode, 0);
 
 							$this->getNextToken();
 
@@ -113,6 +121,8 @@ class Parser extends Lexer
 
 							$token = $this->getToken();
 							if ($token == self::END_KEYWORD) {
+								$this->ir->write("\n");
+
 								$this->symbolTable->resetScope($this->scopeId--);
 								$this->getNextToken();
 
@@ -151,6 +161,8 @@ class Parser extends Lexer
 		if ($this->defvar()) {
 			$token = $this->getToken();
 			if ($token == self::SEMICOLON_KEYWORD) {
+				$this->ir->write("\n");
+
 				$this->getNextToken();
 				return true;
 			} else
@@ -167,11 +179,14 @@ class Parser extends Lexer
 			if ($token == self::OPEN_PARENTHESES) {
 				$this->getNextToken();
 
-				if ($this->expr()) {
+				if ($expAddr = $this->expr()) {
 
 					$token = $this->getToken();
 					if ($token == self::CLOSE_PARENTHESES) {
 						$this->getNextToken();
+
+						$out = $this->ir->label();
+						$this->ir->write("jnz $expAddr, $out");
 
 						$this->stmt($funcNode);
 
@@ -179,9 +194,13 @@ class Parser extends Lexer
 						if ($token == self::ELSE_KEYWORD) {
 							$this->getNextToken();
 
+							$this->ir->write("$out: \n");
+
 							$this->stmt($funcNode);
 							return true;
 						}
+
+						$this->ir->write("$out: \n");
 
 						return true;
 					} else
@@ -195,22 +214,31 @@ class Parser extends Lexer
 		if ($token == self::WHILE_KEYWORD) {
 			$this->getNextToken();
 
+			$out = $this->ir->label();
+			$beg = $this->ir->label();
+
+			$this->ir->write("$beg: \n");
+
 			$token = $this->getToken();
 			if ($token == self::OPEN_PARENTHESES) {
 				$this->getNextToken();
 
-				if ($this->expr()) {
+				if ($expAddr = $this->expr()) {
 
 					$token = $this->getToken();
 					if ($token == self::CLOSE_PARENTHESES) {
 						$this->getNextToken();
 
+						$this->ir->write("jnz $expAddr, $out \n");
+
 						$token = $this->getToken();
 						if ($token == self::DO_KEYWORD) {
 							$this->getNextToken();
 
-							if ($this->stmt($funcNode))
+							if ($this->stmt($funcNode)){
+								$this->ir->write("jmp $beg \n $out \n");
 								return true;
+							}
 						} else
 							$this->syntaxError("expected `" . self::DO_KEYWORD . "`; $token given");
 					} else
@@ -277,6 +305,9 @@ class Parser extends Lexer
 				$token = $this->getToken();
 				if ($token == self::SEMICOLON_KEYWORD) {
 					$this->getNextToken();
+
+					$this->ir->write("mov r0, $type->addr \n ret \n");
+
 					return true;
 				} else
 					$this->syntaxError("expected `" . self::SEMICOLON_KEYWORD . "`; $token given");
@@ -298,9 +329,11 @@ class Parser extends Lexer
 		}
 
 		//expression
-		if ($this->expr()) { // TODO
+		if ($this->expr()) {
 			$token = $this->getToken();
 			if ($token == self::SEMICOLON_KEYWORD) {
+				$this->ir->write("\n");
+
 				$this->getNextToken();
 				return true;
 			} else
@@ -316,14 +349,14 @@ class Parser extends Lexer
 		$res = false;
 		if ($token == self::VAL_KEYWORD) {
 			$this->getNextToken();
+			$res = true;
 
 			$varType = $this->type();
 			$varName = $this->getToken();
 			$this->iden($varName, true, $varType) ? $this->getNextToken() : $res = false;
-			$this->symbolTable->addNode(SymbolTable::setVariable($varName, $varType), $this->scopeId);
+			if($res)
+				$this->symbolTable->addNode(SymbolTable::setVariable($varName, $varType), $this->scopeId,$this->ir->temp());
 
-
-			$res = true;
 		}
 		return $res;
 	}
@@ -399,10 +432,12 @@ class Parser extends Lexer
 				}
 				if ($symbol) {
 					//check if it is a identifier the assignment is with same type 
-					if ($symbol->getType() != $secondType->type ?? 'undefined') {
+					if ($symbol->getType() != ($secondType->type ?? 'undefined')) {
 						$id = $symbol->getId();
 						$typeName = SymbolTable::getTypeName($symbol->getType());
 						$this->log("$id is being assigned to a wrong type '($typeName) = ($secondType->typeName)'");
+					}else{
+						$this->ir->write("mov $symbol,$secondType \n");
 					}
 				} else { // identifier is not defined but it is being assigned we can assign it based on assignment type
 
@@ -410,7 +445,7 @@ class Parser extends Lexer
 				}
 			}
 
-
+			
 
 
 			$token = $this->getToken();
@@ -426,11 +461,17 @@ class Parser extends Lexer
 		if ($token == self::QUESTION_MARK) {
 			$this->getNextToken();
 
+			$out = $this->ir->label();
+			$this->ir->write("jnz $type->addr, $out");
+
 			$this->orExpr();
 
 			$token = $this->getToken();
 			if ($token == self::COLON) { //colon for else not for new scope
 				$this->getNextToken();
+
+				$this->ir->write("jnz $type->addr, $out");
+
 			} else
 				$this->syntaxError("expected `" . self::COLON . "`; $token given");
 		}
