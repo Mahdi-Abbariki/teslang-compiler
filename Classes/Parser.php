@@ -385,7 +385,7 @@ class Parser extends Lexer
 		$token = $this->getToken();
 		while ($token == self::ASSIGNMENT_KEYWORD) {
 			$this->getNextToken();
-			$secondType = $this->shortIfExpr();
+			$secondType = $this->assignExpr();
 
 
 			$symbol = SymbolTable::contains($this->symbolTable->getTable(), $type->name, $this->scopeId);
@@ -426,7 +426,7 @@ class Parser extends Lexer
 		if ($token == self::QUESTION_MARK) {
 			$this->getNextToken();
 
-			$this->orExpr();
+			$this->shortIfExpr();
 
 			$token = $this->getToken();
 			if ($token == self::COLON) { //colon for else not for new scope
@@ -443,7 +443,7 @@ class Parser extends Lexer
 
 		while ($this->getToken() == self::OR_KEYWORD) {
 			$this->getNextToken();
-			$this->andExpr();
+			$this->orExpr();
 		}
 		return $type;
 	}
@@ -454,7 +454,7 @@ class Parser extends Lexer
 
 		while ($this->getToken() == self::AND_KEYWORD) {
 			$this->getNextToken();
-			$this->compExpr();
+			$this->andExpr();
 		}
 		return $type;
 	}
@@ -473,7 +473,7 @@ class Parser extends Lexer
 		];
 		while (in_array($this->getToken(), $tokens)) {
 			$this->getNextToken();
-			$this->sumExpr();
+			$this->compExpr();
 		}
 		return $type;
 	}
@@ -484,7 +484,7 @@ class Parser extends Lexer
 		$token = $this->getToken();
 		while (in_array($token, [self::ADDITION_KEYWORD, self::SUBTRACT_KEYWORD])) {
 			$this->getNextToken();
-			$this->termExpr();
+			$this->sumExpr();
 			$token = $this->getToken();
 		}
 		return $type;
@@ -496,7 +496,7 @@ class Parser extends Lexer
 
 		while (in_array($this->getToken(), [self::MULTIPLICATION_KEYWORD, self::DIVIDE_KEYWORD, self::MODULE_KEYWORD])) {
 			$this->getNextToken();
-			$this->factorExpr();
+			$this->termExpr();
 		}
 		return $type;
 	}
@@ -517,7 +517,7 @@ class Parser extends Lexer
 		$token = $this->getToken();
 		if ($token == self::OPEN_BRACKET) {
 			$this->getNextToken();
-			$type = $this->primaryExpr();
+			$type = $this->identifierExpr();
 
 			$token = $this->getToken();
 			if ($token == self::CLOSE_BRACKET) {
@@ -527,7 +527,7 @@ class Parser extends Lexer
 				$this->syntaxError("expected `" . self::CLOSE_BRACKET . "`; $token given");
 		} else if ($token == self::OPEN_PARENTHESES) {
 			$this->getNextToken();
-			$type = $this->primaryExpr();
+			$type = $this->identifierExpr();
 
 			$token = $this->getToken();
 			if ($token == self::CLOSE_PARENTHESES) {
