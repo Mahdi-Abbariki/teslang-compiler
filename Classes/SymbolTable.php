@@ -8,6 +8,13 @@ class SymbolTable
     const ARRAY_TYPE = 2;   //Array
     const INT_TYPE = 3;     //INT
 
+    const PREDEFINED_FUNCTIONS = [
+        "getInt" => "iget",
+        "printInt" => "iput",
+        "createArray" => "createArray",
+        "arrayLength" => "arrayLength",
+        "exit" => "exit",
+    ];
 
     private string $id;
     private int $scope;
@@ -40,10 +47,20 @@ class SymbolTable
 
     public static function setVariable($id, $type)
     {
-        $new = new SymbolTable(false);
+        $new = new SymbolTable();
         $new->setId($id);
         $new->setType($type);
         $new->setIsFunc(false);
+        return $new;
+    }
+
+    public static function setInt($value, $addr)
+    {
+        $new = new SymbolTable();
+        $new->setId($value);
+        $new->setType(self::INT_TYPE);
+        $new->setIsFunc(false);
+        $new->setAddr($addr);
         return $new;
     }
 
@@ -169,6 +186,7 @@ class SymbolTable
             $symbol->setScope($scope);
             $symbol->setAddr($addr);
             array_push($this->table, $symbol);
+            return $symbol;
         }
     }
 

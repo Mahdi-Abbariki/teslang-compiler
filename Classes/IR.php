@@ -8,12 +8,14 @@ class IR
     private $filePointer;
     private $registerCount;
     private $labelCount;
+    private $canWrite;
 
-    public function __construct($clearFile = false, $file = __ROOT__."/dist/IR/output")
+    public function __construct($clearFile = false, $file = __ROOT__ . "/dist/IR/output")
     {
         $this->outputFile = $file;
         $this->registerCount = 0;
         $this->labelCount = 0;
+        $this->canWrite = true;
 
         if ($clearFile)
             @unlink($this->outputFile);
@@ -32,7 +34,8 @@ class IR
 
     public function write($data)
     {
-        fwrite($this->filePointer, $data);
+        if ($this->canWrite)
+            fwrite($this->filePointer, $data);
     }
 
     public function temp()
@@ -43,5 +46,20 @@ class IR
     public function label()
     {
         return "l" . $this->labelCount++;
+    }
+
+    public function doOr($res, $first, $second)
+    {
+    }
+
+    public function resetRegisters()
+    {
+        $this->registerCount = 0;
+    }
+
+    public function stopWriting()
+    {
+        $this->write("----- ERROR");
+        $this->canWrite = false;
     }
 }
