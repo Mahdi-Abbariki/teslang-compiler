@@ -1,13 +1,17 @@
 function main() returns Int:
     val Array arr;
+    val Int a;
     val Int b;
     b = getInt();
+    a = getInt();
     printInt(b);
-    arr = createArray(3);
+    arr = createArray(4);
     arr[0] = 24/8;
     arr[1] = b;
     arr[2] = 5+63+2;
-    arr[3] = 3;
+    arr[3] = arr[2];
+    --arr[5] = 3; -- it will cause error
     b = arrayLength(arr);
+    printInt(b);
     return 0;
 end

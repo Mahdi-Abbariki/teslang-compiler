@@ -34,6 +34,13 @@ class SymbolTable
             $this->setBaseFunctions();
     }
 
+    public function __clone()
+    {
+        foreach ($this->table as &$a) {
+            $a = clone $a;
+        }
+    }
+
     public static function setFunction($id, $type, $paramCount)
     {
         $new = new SymbolTable(false);

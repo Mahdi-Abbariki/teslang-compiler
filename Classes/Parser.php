@@ -57,11 +57,19 @@ class Parser extends Lexer
 	private $scopeId = 1;
 	private IR $ir;
 
+	private $setArrayVar;
+
 	public function __construct($fileAddress)
 	{
 		parent::__construct($fileAddress);
+		$this->resetArrayVar();
 		$this->symbolTable = new SymbolTable(true);
 		$this->ir = new IR(true);
+	}
+
+	private function resetArrayVar()
+	{
+		$this->setArrayVar = (object)["active" => false];
 	}
 
 	public function startParsing()
@@ -271,7 +279,7 @@ class Parser extends Lexer
 							$token = $this->getToken();
 							if ($token == self::CLOSE_PARENTHESES) {
 								$this->getNextToken();
-								
+
 								if ($stmt = $this->stmt($funcNode))
 									return true;
 							} else
@@ -442,8 +450,29 @@ class Parser extends Lexer
 				}
 			}
 
-			// $this->ir->write("mov " . $type->symbol->addr . "," . $secondType->symbol->addr . "\n");
-			$type->symbol->addr = $secondType->symbol->addr; // just copy addr to avoid additional not necessary temp vars
+			//if the setArrayVar->active is true, type is an array and we should set the length
+			//for additional checking in future if the len is an int not a identifier
+			if ($this->setArrayVar->active) {
+				$typeSymbol = SymbolTable::contains($this->symbolTable->getTable(), $type->name, $this->scopeId);
+				if ($typeSymbol->getType() == SymbolTable::ARRAY_TYPE)
+					$typeSymbol->setParamCount($this->setArrayVar->len);
+				$this->resetArrayVar();
+			}
+
+			//store in array
+			if (isset($type->fromArray) && $type->fromArray) {
+				$firstSym = $type->symbol;
+				$this->ir->write("st $firstSym->addr, " . $secondType->symbol->addr . "\n");
+			} else {
+				// $this->ir->write("mov " . $type->symbol->addr . "," . $secondType->symbol->addr . "\n");
+				$typeSymbol = SymbolTable::contains($this->symbolTable->getTable(), $type->name, $this->scopeId);
+				if ($typeSymbol)
+					$typeSymbol->addr = $secondType->symbol->addr; // just copy addr to avoid additional not necessary temp vars
+				else
+					$type->symbol->addr = $secondType->symbol->addr;
+			}
+
+
 
 
 
@@ -503,6 +532,7 @@ class Parser extends Lexer
 
 			$this->ir->writeLabel($out);
 			$type->symbol->setAddr($finalAnswer);
+			$type->name .= "||" .  $secType->name;
 		}
 		return $type;
 	}
@@ -528,6 +558,7 @@ class Parser extends Lexer
 
 			$this->ir->writeLabel($out);
 			$type->symbol->setAddr($finalAnswer);
+			$type->name .= "&&" .  $secType->name;
 		}
 		return $type;
 	}
@@ -553,30 +584,36 @@ class Parser extends Lexer
 			$temp = $this->ir->temp();
 			switch ($token) {
 				case self::EQUAL_KEYWORD: {
+						$type->name .= "==" .  $secType->name;
 						$this->ir->write("cmp= $temp, " . $type->symbol->addr . "," . $secType->symbol->addr . "\n");
 						break;
 					}
 
 				case self::NOT_EQUAL_KEYWORD: {
+						$type->name .= "!=" .  $secType->name;
 						$this->ir->doNotEqual($temp, $type->symbol->addr, $secType->symbol->addr);
 						break;
 					}
 
 				case self::SMALLER_EQUAL_KEYWORD: {
+						$type->name .= "<=" .  $secType->name;
 						$this->ir->write("cmp<= $temp," . $type->symbol->addr . "," . $secType->symbol->addr . "\n");
 						break;
 					}
 
 				case self::SMALLER_KEYWORD: {
+						$type->name .= "<" .  $secType->name;
 						$this->ir->write("cmp< $temp," . $type->symbol->addr . "," . $secType->symbol->addr . "\n");
 						break;
 					}
 
 				case self::GREATER_EQUAL_KEYWORD: {
+						$type->name .= "=>" .  $secType->name;
 						$this->ir->write("cmp>= $temp," . $type->symbol->addr . "," . $secType->symbol->addr . "\n");
 						break;
 					}
 				case self::GREATER_KEYWORD: {
+						$type->name .= ">" .  $secType->name;
 						$this->ir->write("cmp> $temp," . $type->symbol->addr . "," . $secType->symbol->addr . "\n");
 						break;
 					}
@@ -604,11 +641,13 @@ class Parser extends Lexer
 			$temp = $this->ir->temp();
 			switch ($token) {
 				case self::ADDITION_KEYWORD: {
+						$type->name .= "+" .  $secondType->name;
 						$this->ir->write("add $temp, " . $type->symbol->addr . ", " . $secondType->symbol->addr . "\n");
 						break;
 					}
 
 				case self::SUBTRACT_KEYWORD: {
+						$type->name .= "-" .  $secondType->name;
 						$this->ir->write("sub $temp, " . $type->symbol->addr . ", " . $secondType->symbol->addr . "\n");
 						break;
 					}
@@ -636,16 +675,19 @@ class Parser extends Lexer
 
 			switch ($token) {
 				case self::MULTIPLICATION_KEYWORD: {
+						$type->name .= "*" .  $secondType->name;
 						$this->ir->write("mul " . $type->symbol->addr . ", " . $type->symbol->addr . ", " . $secondType->symbol->addr . "\n");
 						break;
 					}
 
 				case self::DIVIDE_KEYWORD: {
+						$type->name .= "/" .  $secondType->name;
 						$this->ir->write("div " . $type->symbol->addr . ", " . $type->symbol->addr . ", " . $secondType->symbol->addr . "\n");
 						break;
 					}
 
 				case self::MODULE_KEYWORD: {
+						$type->name .= "%" .  $secondType->name;
 						$this->ir->write("mod " . $type->symbol->addr . ", " . $type->symbol->addr . ", " . $secondType->symbol->addr . "\n");
 						break;
 					}
@@ -698,14 +740,44 @@ class Parser extends Lexer
 		$token = $this->getToken();
 		if ($token == self::OPEN_BRACKET) {
 			$this->getNextToken();
+			$firstSymbol = $type->symbol;
 
-			$type = $this->expr();
-			//TODO
+			$secType = $this->expr();
+			$secondSym = $secType->symbol;
+
+			if ($type->typeName != "array")
+				$this->syntaxError("unexpected token [ after $type->name");
+			// if ($secType->typeName != SymbolTable::getTypeName(SymbolTable::INT_TYPE))
+			// 	$this->syntaxError("unexpected index");
+
+			$index = (((int)$secondSym->getId()));
+			$arrayLen = $firstSymbol->getParamCount();
+			if ($arrayLen > 0 && $index >=  $arrayLen)
+				$this->log("set value out of bounds of array max index is " . $arrayLen - 1 . " setting $index", true);
+
+			$t = $this->ir->temp();
+			$t2 = $this->ir->temp();
+			$this->ir->write("mov $t, 1\n");
+			$this->ir->write("mov $t2, " . IR::DATA_BYTE . "\n");
+			$this->ir->write("add $t, $t, $secondSym->addr\n");
+			$this->ir->write("mul $t, $t, $t2\n");
+			$this->ir->write("add $t, $t, $firstSymbol->addr\n"); //desired array address is in $t
+
+
+			$object = (object)[];
+			$object->name = $firstSymbol->addr . "[$secondSym->addr]";
+			$object->fromArray = true;
+			$object->typeName = SymbolTable::getTypeName(SymbolTable::INT_TYPE);
+			$object->type = SymbolTable::INT_TYPE;
+			$addr = $t;
+			$object->symbol = SymbolTable::setInt($firstSymbol->addr . "[$secondSym->addr]", $addr);
+
+
 
 			$token = $this->getToken();
 			if ($token == self::CLOSE_BRACKET) {
 				$this->getNextToken();
-				return $type;
+				return $object;
 			} else
 				$this->syntaxError("expected `" . self::CLOSE_BRACKET . "`; $token given");
 		} else if ($token == self::OPEN_PARENTHESES) {
@@ -786,6 +858,8 @@ class Parser extends Lexer
 								if ($key > 0)
 									$resIR .= ", $symbol->addr";
 
+
+						$this->builtInFunctionsAddons($funcName, $params);
 						$this->ir->write($resIR . "\n");
 					} else
 						$this->syntaxError("expected `" . self::CLOSE_PARENTHESES . "`; $token given");
@@ -796,8 +870,15 @@ class Parser extends Lexer
 
 			//identifier
 		}
-		if ($object)
-			$object->symbol = SymbolTable::contains($this->symbolTable->getTable(), $object->name, $this->scopeId);
+		if ($object) {
+			$obj =
+				SymbolTable::contains($this->symbolTable->getTable(), $object->name, $this->scopeId);
+			if ($obj) {
+				if ($obj->getType() == SymbolTable::ARRAY_TYPE)
+					$object->typeName = "array";
+				$object->symbol = clone $obj;
+			}
+		}
 		return $object;
 	}
 
@@ -874,11 +955,7 @@ class Parser extends Lexer
 
 	private function num($token)
 	{
-		if (preg_match('/^[0-9]+$/', $token)) {
-
-			return true;
-		} else
-			return false;
+		return (bool)preg_match('/^[0-9]+$/', $token);
 	}
 
 	/**
@@ -929,5 +1006,23 @@ class Parser extends Lexer
 		if ($stopWritingIR)
 			$this->ir->stopWriting();
 		echo "\e[93mParser Warning :\nLine Number :" . $this->getCounter() . ", Reason : $string\n\n";
+	}
+
+	private function builtInFunctionsAddons($funcName, $params)
+	{
+		switch ($funcName) {
+			case "createArray": {
+					$lenSym = $params[0];
+					$id = $lenSym->getId();
+					if ($this->num($id)) {
+						if ((int)$id <= 0)
+							$this->log("array len must be greater than 0", true);
+						$this->setArrayVar->active = true;
+						$this->setArrayVar->len = (int)$lenSym->getId();
+					}
+
+					break;
+				}
+		}
 	}
 }

@@ -10,7 +10,7 @@ class IR
     private $labelCount;
     private $canWrite;
 
-    private const DATA_BYTE = 32;
+    const DATA_BYTE = 32;
 
     public function __construct($clearFile = false, $file = __ROOT__ . "/dist/IR/output")
     {
