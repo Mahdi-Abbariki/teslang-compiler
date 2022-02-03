@@ -193,8 +193,9 @@ class Parser extends Lexer
 						$this->getNextToken();
 
 						$out = $this->ir->label();
+						$else = $this->ir->label();
 						$addr = $expAddr->symbol->addr;
-						$this->ir->write("jnz $addr, $out\n");
+						$this->ir->write("jz $addr, $else\n");
 
 						$this->stmt($funcNode, true);
 
@@ -202,18 +203,20 @@ class Parser extends Lexer
 						if ($token == self::ELSE_KEYWORD) {
 							$this->getNextToken();
 
-							$this->ir->writeLabel($out);
+							$this->ir->write("jmp $out\n");
+							$this->ir->writeLabel($else);
 
 							$this->stmt($funcNode);
 							$token = $this->getToken();
 							if ($token == self::END_KEYWORD) { //end token was ignored with checking $fromIf
 								$this->symbolTable->resetScope($this->scopeId--);
 								$this->getNextToken();
+								$this->ir->writeLabel($out);
 								return true;
 							}
 						}
 
-						$this->ir->write("$out: \n");
+						$this->ir->writeLabel($out);
 
 						return true;
 					} else
@@ -508,9 +511,9 @@ class Parser extends Lexer
 			//store in array
 			if (isset($type->fromArray) && $type->fromArray) {
 				$firstSym = $type->symbol;
-				$this->ir->write("st $firstSym->addr, " . $secondType->symbol->addr . "\n");
+				$this->ir->write("st " . $secondType->symbol->addr . ", $firstSym->addr\n");
 			} else {
-				$this->ir->write("mov " . $type->symbol->addr . "," . $secondType->symbol->addr . "\n");
+				$this->ir->write("mov " . $type->symbol->addr . ", " . $secondType->symbol->addr . "\n");
 				// $typeSymbol = SymbolTable::contains($this->symbolTable->getTable(), $type->name, $this->scopeId);
 				// if ($typeSymbol)
 				// $typeSymbol->addr = $secondType->symbol->addr; // just copy addr to avoid additional not necessary temp vars
@@ -631,7 +634,7 @@ class Parser extends Lexer
 			switch ($token) {
 				case self::EQUAL_KEYWORD: {
 						$type->name .= "==" .  $secType->name;
-						$this->ir->write("cmp= $temp, " . $type->symbol->addr . "," . $secType->symbol->addr . "\n");
+						$this->ir->write("cmp= $temp, " . $type->symbol->addr . ", " . $secType->symbol->addr . "\n");
 						break;
 					}
 
@@ -643,24 +646,24 @@ class Parser extends Lexer
 
 				case self::SMALLER_EQUAL_KEYWORD: {
 						$type->name .= "<=" .  $secType->name;
-						$this->ir->write("cmp<= $temp," . $type->symbol->addr . "," . $secType->symbol->addr . "\n");
+						$this->ir->write("cmp<= $temp, " . $type->symbol->addr . ", " . $secType->symbol->addr . "\n");
 						break;
 					}
 
 				case self::SMALLER_KEYWORD: {
 						$type->name .= "<" .  $secType->name;
-						$this->ir->write("cmp< $temp," . $type->symbol->addr . "," . $secType->symbol->addr . "\n");
+						$this->ir->write("cmp< $temp, " . $type->symbol->addr . ", " . $secType->symbol->addr . "\n");
 						break;
 					}
 
 				case self::GREATER_EQUAL_KEYWORD: {
 						$type->name .= "=>" .  $secType->name;
-						$this->ir->write("cmp>= $temp," . $type->symbol->addr . "," . $secType->symbol->addr . "\n");
+						$this->ir->write("cmp>= $temp, " . $type->symbol->addr . ", " . $secType->symbol->addr . "\n");
 						break;
 					}
 				case self::GREATER_KEYWORD: {
 						$type->name .= ">" .  $secType->name;
-						$this->ir->write("cmp> $temp," . $type->symbol->addr . "," . $secType->symbol->addr . "\n");
+						$this->ir->write("cmp> $temp, " . $type->symbol->addr . ", " . $secType->symbol->addr . "\n");
 						break;
 					}
 			}
@@ -895,7 +898,9 @@ class Parser extends Lexer
 						$object->typeName = "function";
 
 						$funcName = $object->name;
-						$addr = (isset($params[0])) ? $params[0]->addr : $this->ir->temp();
+						$addr =  $this->ir->temp();
+						if (isset($params[0]))
+							$this->ir->write("mov $addr, " . $params[0]->addr . "\n");
 						$functionSymbol->setAddr($addr);
 						$resIR = "call $funcName, $addr";
 

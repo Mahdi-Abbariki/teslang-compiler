@@ -10,7 +10,7 @@ class IR
     private $labelCount;
     private $canWrite;
 
-    const DATA_BYTE = 32;
+    const DATA_BYTE = 8;
 
     public function __construct($clearFile = false, $file = __ROOT__ . "/dist/IR/output")
     {
@@ -120,13 +120,13 @@ class IR
         $this->write("mul r1, r1, r2\n");
 
         //get the memory
-        $this->write("call mem, r2\n");
+        $this->write("call mem, r1\n");
 
         //write array len to index 0 of array (r2)
-        $this->write("st r1, r2\n");
+        $this->write("st r0, r1\n");
 
         //return res
-        $this->write("mov r0, r2\n");
+        $this->write("mov r0, r1\n");
         $this->write("ret\n\n");
     }
 
