@@ -1,10 +1,25 @@
+function sumArr(Array a) returns Int:
+    val Int sum;
+    sum = 0;
+    foreach(i of a):
+        sum = sum * i;
+    end
+    return sum;
+end
+
 function main() returns Int:
     val Array arr;
     val Int a;
     val Int b;
+    val Int c;
     b = getInt();
     a = getInt();
+    c = a * b;
+    c = a / c;
+    c = a % c;
     printInt(b);
+    printInt(a);
+    printInt(c);
     arr = createArray(4);
     arr[0] = 24/8;
     arr[1] = b;
@@ -12,6 +27,6 @@ function main() returns Int:
     arr[3] = arr[2];
     --arr[5] = 3; -- it will cause error
     b = arrayLength(arr);
-    printInt(b);
+    printInt(sumArr(arr));
     return 0;
 end

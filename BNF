@@ -11,7 +11,7 @@ stmt::=     expr ; {print "\n"} |
             if ( expr ) {$out = label(); jnz expr->addr, $out} stmt {print $out: } |
             if ( expr ) {$out = label(); jnz expr->addr, $out} stmt else {print $out: } stmt |
             while {$out =label(); $beg = label(); print $beg:}  ( expr ) {print jnz expr->addr, $out} do stmt {print jmp $beg \n $out:} |
-->TODO      foreach ( iden of expr ) stmt |
+            foreach ( iden of expr ) stmt |
             return expr ; {print mov r0,expr->addr ret \n} |
             : body end {print \n}
 
