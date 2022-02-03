@@ -104,7 +104,7 @@ class Parser extends Lexer
 						$token = $this->getToken();
 						if ($token == self::COLON) {
 							//produce IR for function
-							$this->ir->write("proc	" . $funcName . "\n");
+							$this->ir->write("proc	" . $funcName . "\n", false);
 
 
 
@@ -194,7 +194,7 @@ class Parser extends Lexer
 						if ($token == self::ELSE_KEYWORD) {
 							$this->getNextToken();
 
-							$this->ir->write("$out: \n");
+							$this->ir->writeLabel($out);
 
 							$this->stmt($funcNode);
 							return true;
@@ -217,7 +217,7 @@ class Parser extends Lexer
 			$out = $this->ir->label();
 			$beg = $this->ir->label();
 
-			$this->ir->write("$beg: \n");
+			$this->ir->writeLabel($beg);
 
 			$token = $this->getToken();
 			if ($token == self::OPEN_PARENTHESES) {
@@ -236,7 +236,8 @@ class Parser extends Lexer
 							$this->getNextToken();
 
 							if ($this->stmt($funcNode)) {
-								$this->ir->write("jmp $beg \n$out \n");
+								$this->ir->write("jmp $beg");
+								$this->ir->writeLabel($out);
 								return true;
 							}
 						} else
@@ -442,7 +443,7 @@ class Parser extends Lexer
 			}
 
 			// $this->ir->write("mov " . $type->symbol->addr . "," . $secondType->symbol->addr . "\n");
-			$type->symbol->addr = $secondType->symbol->addr;
+			$type->symbol->addr = $secondType->symbol->addr; // just copy addr to avoid additional not necessary temp vars
 
 
 
@@ -458,20 +459,26 @@ class Parser extends Lexer
 		$token = $this->getToken();
 		if ($token == self::QUESTION_MARK) {
 			$this->getNextToken();
+			$else = $this->ir->label();
 			$out = $this->ir->label();
-			$this->ir->write("jnz $type->addr, $out");
+			$finalAnswer = $this->ir->temp();
+			$this->ir->write("jnz " . $type->symbol->addr . ", $else\n");
 
-			$this->shortIfExpr();
-
+			$secType = $this->shortIfExpr();
+			$this->ir->write("mov $finalAnswer, " . $secType->symbol->addr . "\n");
+			$this->ir->write("jmp $out\n");
 			$token = $this->getToken();
 			if ($token == self::COLON) { //colon for else not for new scope
 				$this->getNextToken();
+				$this->ir->writeLabel($else);
 
-				$this->ir->write("$out: \n");
-
-				$this->shortIfExpr();
+				$secType = $this->shortIfExpr();
+				$this->ir->write("mov $finalAnswer, " . $secType->symbol->addr . "\n");
+				$this->ir->writeLabel($out);
 			} else
 				$this->syntaxError("expected `" . self::COLON . "`; $token given");
+
+			$type->symbol->setAddr($finalAnswer);
 		}
 		return $type;
 	}
@@ -479,20 +486,23 @@ class Parser extends Lexer
 	private function orExpr()
 	{
 		$type = $this->andExpr();
-
 		while ($this->getToken() == self::OR_KEYWORD) {
 			$this->getNextToken();
+			$finalAnswer = $this->ir->temp();
+			$first = $type->symbol->addr;
 
 			$out = $this->ir->label();
+			$this->ir->write("mov $finalAnswer, 1\n");
+			$this->ir->write("jnz $first, $out\n");
 
-			$type->addr = 1;
+			$secType = $this->expr();
+			$second = $secType->symbol->addr;
 
-			$this->ir->write("jz $type->addr, $out");
+			$this->ir->write("jnz $second, $out\n");
+			$this->ir->write("mov $finalAnswer, 0\n");
 
-			$secType = $this->orExpr();
-
-			// $this->ir->doOr();
-			$this->ir->write("$out: \n");
+			$this->ir->writeLabel($out);
+			$type->symbol->setAddr($finalAnswer);
 		}
 		return $type;
 	}
@@ -503,7 +513,21 @@ class Parser extends Lexer
 
 		while ($this->getToken() == self::AND_KEYWORD) {
 			$this->getNextToken();
-			$this->andExpr();
+			$finalAnswer = $this->ir->temp();
+			$first = $type->symbol->addr;
+
+			$out = $this->ir->label();
+			$this->ir->write("mov $finalAnswer, 0\n");
+			$this->ir->write("jz $first, $out\n");
+
+			$secType = $this->expr();
+			$second = $secType->symbol->addr;
+
+			$this->ir->write("jz $second, $out\n");
+			$this->ir->write("mov $finalAnswer, 1\n");
+
+			$this->ir->writeLabel($out);
+			$type->symbol->setAddr($finalAnswer);
 		}
 		return $type;
 	}
@@ -520,9 +544,45 @@ class Parser extends Lexer
 			self::NOT_EQUAL_KEYWORD,
 			self::EQUAL_KEYWORD
 		];
-		while (in_array($this->getToken(), $tokens)) {
+		$token = $this->getToken();
+		while (in_array($token, $tokens)) {
 			$this->getNextToken();
-			$this->compExpr();
+
+			$secType = $this->expr();
+
+			$temp = $this->ir->temp();
+			switch ($token) {
+				case self::EQUAL_KEYWORD: {
+						$this->ir->write("cmp= $temp, " . $type->symbol->addr . "," . $secType->symbol->addr . "\n");
+						break;
+					}
+
+				case self::NOT_EQUAL_KEYWORD: {
+						$this->ir->doNotEqual($temp, $type->symbol->addr, $secType->symbol->addr);
+						break;
+					}
+
+				case self::SMALLER_EQUAL_KEYWORD: {
+						$this->ir->write("cmp<= $temp," . $type->symbol->addr . "," . $secType->symbol->addr . "\n");
+						break;
+					}
+
+				case self::SMALLER_KEYWORD: {
+						$this->ir->write("cmp< $temp," . $type->symbol->addr . "," . $secType->symbol->addr . "\n");
+						break;
+					}
+
+				case self::GREATER_EQUAL_KEYWORD: {
+						$this->ir->write("cmp>= $temp," . $type->symbol->addr . "," . $secType->symbol->addr . "\n");
+						break;
+					}
+				case self::GREATER_KEYWORD: {
+						$this->ir->write("cmp> $temp," . $type->symbol->addr . "," . $secType->symbol->addr . "\n");
+						break;
+					}
+			}
+			$type->symbol->setAddr($temp);
+			$token = $this->getToken();
 		}
 		return $type;
 	}
@@ -534,7 +594,6 @@ class Parser extends Lexer
 		while (in_array($token, [self::ADDITION_KEYWORD, self::SUBTRACT_KEYWORD])) {
 			$this->getNextToken();
 			$secondType = $this->sumExpr();
-			$token = $this->getToken();
 			var_dump($type, $secondType);
 
 			if ($type->typeName == "identifier" && !$type->symbol)
@@ -543,9 +602,20 @@ class Parser extends Lexer
 			if ($secondType->typeName == "identifier" && !$secondType->symbol)
 				$this->syntaxError("$secondType->id value is used, but is not defined");
 
-			$this->ir->write("add " . $type->symbol->addr . ", " . $type->symbol->addr . ", " . $secondType->symbol->addr . "\n");
+			$temp = $this->ir->temp();
+			switch ($token) {
+				case self::ADDITION_KEYWORD: {
+						$this->ir->write("add $temp, " . $type->symbol->addr . ", " . $secondType->symbol->addr . "\n");
+						break;
+					}
 
-			echo "\n";
+				case self::SUBTRACT_KEYWORD: {
+						$this->ir->write("sub $temp, " . $type->symbol->addr . ", " . $secondType->symbol->addr . "\n");
+						break;
+					}
+			}
+			$type->symbol->setAddr($temp);
+			$token = $this->getToken();
 		}
 		return $type;
 	}
@@ -554,20 +624,64 @@ class Parser extends Lexer
 	{
 		$type = $this->factorExpr();
 
-		while (in_array($this->getToken(), [self::MULTIPLICATION_KEYWORD, self::DIVIDE_KEYWORD, self::MODULE_KEYWORD])) {
+		$token = $this->getToken();
+		while (in_array($token, [self::MULTIPLICATION_KEYWORD, self::DIVIDE_KEYWORD, self::MODULE_KEYWORD])) {
 			$this->getNextToken();
-			$this->termExpr();
+			$secondType = $this->termExpr();
+
+			if ($type->typeName == "identifier" && !$type->symbol)
+				$this->syntaxError("$type->name value is used, but is not defined");
+
+			if ($secondType->typeName == "identifier" && !$secondType->symbol)
+				$this->syntaxError("$secondType->name value is used, but is not defined");
+
+			switch ($token) {
+				case self::MULTIPLICATION_KEYWORD: {
+						$this->ir->write("mul " . $type->symbol->addr . ", " . $type->symbol->addr . ", " . $secondType->symbol->addr . "\n");
+						break;
+					}
+
+				case self::DIVIDE_KEYWORD: {
+						$this->ir->write("div " . $type->symbol->addr . ", " . $type->symbol->addr . ", " . $secondType->symbol->addr . "\n");
+						break;
+					}
+
+				case self::MODULE_KEYWORD: {
+						$this->ir->write("mod " . $type->symbol->addr . ", " . $type->symbol->addr . ", " . $secondType->symbol->addr . "\n");
+						break;
+					}
+			}
+
+
+			$token = $this->getToken();
 		}
 		return $type;
 	}
 
 	private function factorExpr()
 	{
-		// $type = 
-		while (in_array($this->getToken(), [self::POSITIVATE_KEYWORD, self::NEGATE_KEYWORD, self::NOT_KEYWORD])) {
+		$token = $this->getToken();
+		if (in_array($token, [self::POSITIVATE_KEYWORD, self::NEGATE_KEYWORD, self::NOT_KEYWORD])) {
 			$this->getNextToken();
-			//return $this->identifierExpr();
+			$type = $this->identifierExpr();
+			$finalAnswer = $this->ir->temp();
+			switch ($token) {
+				case self::POSITIVATE_KEYWORD: {
+						
+						break;
+					}
+				case self::NEGATE_KEYWORD: {
+						break;
+					}
+
+				case self::NOT_KEYWORD: {
+						break;
+					}
+			}
+			$this->type->symbol->setAddr($finalAnswer);
+			return $type;
 		}
+
 		return $this->identifierExpr();;
 	}
 
@@ -577,7 +691,9 @@ class Parser extends Lexer
 		$token = $this->getToken();
 		if ($token == self::OPEN_BRACKET) {
 			$this->getNextToken();
-			$type = $this->identifierExpr();
+
+			$type = $this->expr();
+			//TODO
 
 			$token = $this->getToken();
 			if ($token == self::CLOSE_BRACKET) {
@@ -587,12 +703,13 @@ class Parser extends Lexer
 				$this->syntaxError("expected `" . self::CLOSE_BRACKET . "`; $token given");
 		} else if ($token == self::OPEN_PARENTHESES) {
 			$this->getNextToken();
-			$type = $this->identifierExpr();
+
+			$type = $this->expr();
 
 			$token = $this->getToken();
 			if ($token == self::CLOSE_PARENTHESES) {
 				$this->getNextToken();
-				return self::NUll_TYPE;
+				return $type;
 			} else
 				$this->syntaxError("expected `" . self::CLOSE_PARENTHESES . "`; $token given");
 		}

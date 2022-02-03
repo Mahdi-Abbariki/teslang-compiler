@@ -152,7 +152,7 @@ class Lexer
             } else if ($char == "|") {
                 $c = $this->getChar();
                 if ($c == "|")
-                    return "!=";
+                    return "||";
                 $this->unGetChar();//the token is || and we don't have any token as |
                 $this->unGetChar();
                 return false;

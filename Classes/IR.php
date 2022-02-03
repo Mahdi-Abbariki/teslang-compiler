@@ -32,10 +32,19 @@ class IR
         $this->filePointer = fopen($this->outputFile, 'a+');
     }
 
-    public function write($data)
+    public function write($data,$withTab = true)
+    {
+        if ($this->canWrite){
+            if($withTab)
+                $data = "   ".$data;
+            fwrite($this->filePointer, $data);
+        }
+    }
+
+    public function writeLabel($label)
     {
         if ($this->canWrite)
-            fwrite($this->filePointer, $data);
+            fwrite($this->filePointer, $label . ":\n");
     }
 
     public function temp()
@@ -45,11 +54,18 @@ class IR
 
     public function label()
     {
-        return "l" . $this->labelCount++;
+        return "lb" . $this->labelCount++;
     }
 
-    public function doOr($res, $first, $second)
+    public function doNotEqual($res, $first, $second)
     {
+        $this->write("mov $res, 0\n");
+        $temp = $this->temp();
+        $label = $this->label();
+        $this->write("cmp= $temp, $first, $second\n");
+        $this->write("jz $temp, $label\n");
+        $this->writeLabel($label);
+        $this->write("mov $res, 1");
     }
 
     public function resetRegisters()

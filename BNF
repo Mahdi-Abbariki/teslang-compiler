@@ -20,7 +20,7 @@ defvar::=   val type iden {iden->addr = temp()}
 expr::=     iden ( {print call iden} clist ) |
             expr [ expr ] |
             expr ? {$out = label(); jnz expr->addr, $out} expr : {print $out: } expr |
-            expr = expr     {print mov expr1->addr, expr2->addr \n} |
+            expr = expr     {print mov expr1->addr, expr2->addr (expr1->addr = expr2->addr) \n} |
             expr + expr     {print add expr1->addr, expr1->addr, expr2->addr \n} |
             expr - expr     {print sub expr1->addr, expr1->addr, expr2->addr} |
             expr * expr     {print mul expr1->addr, expr1->addr, expr2->addr} |
@@ -34,8 +34,8 @@ expr::=     iden ( {print call iden} clist ) |
             expr >= expr    {print cmp>= expr1->addr, expr1->addr, expr2->addr} |
             expr || {$out = label(); res->addr = const(1); print jz expr1->addr, $out} expr {print expr1->addr OR expr2->addr \n $out:} |
             expr && {$out = label(); res->addr = const(0); print jnz expr1->addr, $out} expr {print expr1->addr AND expr2->addr \n $out} |
-            ! expr {print NOT expr} |
-            - expr {NEGATE expr} |
+->TODO      ! expr {print NOT expr} |
+->TODO      - expr {mov temp(), -1, mul expr->addr, expr,addr,temp()} |
             + expr |
             ( expr ) |
             iden {expr->addr = iden->addr}|
