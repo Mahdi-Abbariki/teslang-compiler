@@ -259,20 +259,20 @@ class Parser extends Lexer
 				$this->getNextToken();
 
 				$token = $this->getToken();
-				if ($this->iden($token, false)) {
+				if ($iden = $this->iden($token, false)) {
 					$this->getNextToken();
 
 					$token = $this->getToken();
 					if ($token == self::OF_KEYWORD) {
 						$this->getNextToken();
 
-						if ($this->expr()) {
+						if ($expr = $this->expr()) {
 
 							$token = $this->getToken();
 							if ($token == self::CLOSE_PARENTHESES) {
 								$this->getNextToken();
-
-								if ($this->stmt($funcNode))
+								
+								if ($stmt = $this->stmt($funcNode))
 									return true;
 							} else
 								$this->syntaxError("expected `" . self::CLOSE_PARENTHESES . "`; $token given");
@@ -594,7 +594,6 @@ class Parser extends Lexer
 		while (in_array($token, [self::ADDITION_KEYWORD, self::SUBTRACT_KEYWORD])) {
 			$this->getNextToken();
 			$secondType = $this->sumExpr();
-			var_dump($type, $secondType);
 
 			if ($type->typeName == "identifier" && !$type->symbol)
 				$this->syntaxError("$type->id value is used, but is not defined");
@@ -778,9 +777,6 @@ class Parser extends Lexer
 						$object->typeName = "function";
 
 						$funcName = $object->name;
-						if ($functionSymbol->getScope() == 0) // default functions of tslang
-							$funcName = SymbolTable::PREDEFINED_FUNCTIONS[$funcName];
-
 						$addr = (isset($params[0])) ? $params[0]->addr : $this->ir->temp();
 						$functionSymbol->setAddr($addr);
 						$resIR = "call $funcName, $addr";

@@ -29,13 +29,13 @@ expr::=     iden ( {print call iden} clist ) |
             expr < expr     {print cmp< expr1->addr, expr1->addr, expr2->addr} |
             expr > expr     {print cmp> expr1->addr, expr1->addr, expr2->addr} |
             expr == expr    {print cmp= expr1->addr, expr1->addr, expr2->addr} |
-->TODO      expr != expr |
+            expr != expr |
             expr <= expr    {print cmp<= expr1->addr, expr1->addr, expr2->addr} |
             expr >= expr    {print cmp>= expr1->addr, expr1->addr, expr2->addr} |
             expr || {$out = label(); res->addr = const(1); print jz expr1->addr, $out} expr {print expr1->addr OR expr2->addr \n $out:} |
             expr && {$out = label(); res->addr = const(0); print jnz expr1->addr, $out} expr {print expr1->addr AND expr2->addr \n $out} |
-->TODO      ! expr {print NOT expr} |
-->TODO      - expr {mov temp(), -1, mul expr->addr, expr,addr,temp()} |
+            ! expr {print NOT expr} |
+            - expr {mov temp(), -1, mul expr->addr, expr,addr,temp()} |
             + expr |
             ( expr ) |
             iden {expr->addr = iden->addr}|
