@@ -667,18 +667,26 @@ class Parser extends Lexer
 			$finalAnswer = $this->ir->temp();
 			switch ($token) {
 				case self::POSITIVATE_KEYWORD: {
-						
+						//no op
 						break;
 					}
 				case self::NEGATE_KEYWORD: {
+						$temp = $this->ir->temp();
+						$this->ir->write("mov $temp, -1\n");
+						$this->ir->write("mul $finalAnswer, " . $type->symbol->addr . ", $temp\n");
 						break;
 					}
 
 				case self::NOT_KEYWORD: {
+						$out = $this->ir->label();
+						$this->ir->write("mov $finalAnswer, 0\n");
+						$this->ir->write("jnz " . $type->symbol->addr . ", $out\n");
+						$this->ir->write("mov $finalAnswer, 1\n");
+						$this->ir->writeLabel($out);
 						break;
 					}
 			}
-			$this->type->symbol->setAddr($finalAnswer);
+			$type->symbol->setAddr($finalAnswer);
 			return $type;
 		}
 
